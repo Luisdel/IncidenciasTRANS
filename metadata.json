@@ -1,0 +1,6 @@
+{
+  "name": "IncidenciasTRANS & ClienteINCIDENCIAS",
+  "description": "Sistema cliente-servidor de gestión de incidencias con servidor IncidenciasTRANS y portal de usuario ClienteINCIDENCIAS con SQLite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
