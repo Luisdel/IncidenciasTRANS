@@ -4,7 +4,7 @@ import { apiClient } from '../services/apiClient.ts';
 import { User as UserType } from '../types.ts';
 
 interface LoginViewProps {
-  onSuccess: (user: UserType) => void;
+  onSuccess: (user: UserType, token: string) => void;
   onCancel?: () => void;
 }
 
@@ -34,7 +34,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
     setError(null);
     try {
       const res = await apiClient.loginUser(username.trim(), fullName.trim(), department.trim());
-      onSuccess(res.user);
+      onSuccess(res.user, res.token);
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesion como usuario');
     } finally {
@@ -53,7 +53,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
     setError(null);
     try {
       const res = await apiClient.loginAdmin(adminUsername.trim(), adminPassword);
-      onSuccess(res.user);
+      onSuccess(res.user, res.token);
     } catch (err: any) {
       setError(err.message || 'Credenciales de administrador incorrectas');
     } finally {
@@ -89,7 +89,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Usuario (Sin pass)</span>
+            <span>Usuario</span>
           </button>
 
           <button
@@ -102,7 +102,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Administrador</span>
+            <span>Admin / Superadmin</span>
           </button>
         </div>
 
@@ -118,7 +118,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
           {activeTab === 'user' ? (
             <form onSubmit={handleUserLogin} className="space-y-4">
               <div className="p-3 bg-sky-950/30 border border-sky-900/50 rounded-xl text-xs text-sky-300/90 leading-relaxed">
-                💡 <strong>Acceso ágil sin contraseña:</strong> En esta red corporativa, introduce tu identificador de usuario previamente dado de alta por el administrador en <em>IncidenciasTRANS</em>.
+                💡 <strong>Acceso ágil sin contraseña:</strong> Si tu identificador no existe todavía, se crea automáticamente como usuario estándar con el nombre y departamento que indiques. El administrador podrá modificarlo después.
               </div>
 
               <div>
@@ -136,6 +136,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
                     placeholder="ej. luis, maria..."
                     className="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-sm focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Nombre completo
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="ej. Luis Martínez"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-sm focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Departamento
+                  </label>
+                  <input
+                    type="text"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="ej. Logística"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-sm focus:outline-hidden focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                   />
                 </div>
               </div>
@@ -160,7 +187,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
               </div>
 
               <div className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-lg text-[11px] text-slate-400">
-                ¿No estás dado de alta? Contacta con el <button type="button" onClick={() => setActiveTab('admin')} className="text-amber-400 underline hover:text-amber-300">administrador</button> para que cree tu cuenta desde el panel de gestión.
+                ¿No estás dado de alta? No pasa nada: al entrar se crea tu cuenta de usuario automáticamente. Un <button type="button" onClick={() => setActiveTab('admin')} className="text-amber-400 underline hover:text-amber-300">administrador</button> podrá modificar tus datos, desactivarte o borrarte desde el panel de gestión.
               </div>
 
               <button
@@ -175,7 +202,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onCancel }) => 
           ) : (
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="p-3 bg-amber-950/30 border border-amber-900/50 rounded-xl text-xs text-amber-300/90 leading-relaxed">
-                🛡️ <strong>Panel de Administrador:</strong> Permite autoasignarse incidencias abiertas de la cola de trabajo, cambiar estados y resolverlas. Requiere autenticación con contraseña.
+                🛡️ <strong>Panel de Administrador:</strong> Permite gestionar usuarios, autoasignarse incidencias de la cola de trabajo, cambiar estados y resolverlas. El <strong>superadmin</strong> además dispone de la zona peligrosa para vaciar la base de datos.
               </div>
 
               <div>

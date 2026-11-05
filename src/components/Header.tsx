@@ -9,7 +9,8 @@ import {
   Network, 
   Zap,
   HardDrive,
-  Users
+  Users,
+  Monitor
 } from 'lucide-react';
 import { User } from '../types.ts';
 import { networkStats, subscribeNetworkStats } from '../services/apiClient.ts';
@@ -21,6 +22,7 @@ interface HeaderProps {
   onOpenNewIncident: () => void;
   onOpenServerModal: () => void;
   onOpenUserManagement: () => void;
+  onOpenClientSessions: () => void;
   onSwitchUser: () => void;
   onSelectIncident: (id: number) => void;
 }
@@ -30,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewIncident,
   onOpenServerModal,
   onOpenUserManagement,
+  onOpenClientSessions,
   onSwitchUser,
   onSelectIncident,
 }) => {
@@ -42,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const totalTransfer = networkStats.bytesSent + networkStats.bytesReceived;
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-slate-100 sticky top-0 z-40 shadow-md">
@@ -117,6 +120,17 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {isAdmin && (
+            <button
+              onClick={onOpenClientSessions}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-900/60 text-xs sm:text-sm font-medium px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg shadow-xs transition-colors"
+              title="Sesiones y equipos de los clientes"
+            >
+              <Monitor className="w-4 h-4 text-sky-400" />
+              <span className="hidden sm:inline">Equipos</span>
+            </button>
+          )}
+
           {/* New Incident Button */}
           {currentUser && (
             <button
@@ -141,7 +155,9 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2 pl-2 border-l border-slate-700">
               <div className="text-right hidden sm:block">
                 <div className="text-xs font-semibold text-white flex items-center justify-end gap-1">
-                  {currentUser.role === 'admin' ? (
+                  {currentUser.role === 'superadmin' ? (
+                    <Shield className="w-3.5 h-3.5 text-fuchsia-400" />
+                  ) : currentUser.role === 'admin' ? (
                     <Shield className="w-3.5 h-3.5 text-amber-400" />
                   ) : (
                     <UserIcon className="w-3.5 h-3.5 text-sky-400" />
@@ -149,7 +165,9 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.full_name || currentUser.username}
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  {currentUser.role === 'admin' ? (
+                  {currentUser.role === 'superadmin' ? (
+                    <span className="text-fuchsia-400 font-medium">Superadmin</span>
+                  ) : currentUser.role === 'admin' ? (
                     <span className="text-amber-400 font-medium">Administrador</span>
                   ) : (
                     <span>{currentUser.department || 'Usuario LAN'}</span>

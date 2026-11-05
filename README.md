@@ -17,12 +17,18 @@ Sistema integral cliente-servidor de gestión de incidencias y soporte técnico 
   * **Compresión inteligente en cliente**: Al adjuntar capturas de pantalla o fotografías (desde el explorador, arrastrando o pegando con `Ctrl+V`), la imagen se reescala a un máximo de 1280px y se convierte a formato **WebP** antes de transmitirse. Reduce archivos pesados de 3–8 MB a solo **40–80 KB** (más del 95% de ahorro de ancho de banda).
   * Visor Lightbox integrado para ampliación a resolución completa y descarga.
 * **Autenticación y Control de Acceso Diferenciado**:
-  * **Usuarios estándar**: Acceso ágil sin contraseña (solo indicando su nombre de usuario/login previamente registrado), ideal para puestos de trabajo en muelles, almacén o terminales compartidos.
+  * **Usuarios estándar**: Acceso ágil sin contraseña. Si el usuario no existe, se **crea automáticamente** como usuario estándar activo usando el nombre y el departamento del formulario de acceso. Un administrador puede seguir editando, desactivando, cambiando de rol o eliminando esas cuentas.
   * **Aislamiento estricto de privacidad**: Los usuarios **únicamente pueden ver y seguir sus propias incidencias**. El servidor bloquea el acceso a cualquier ticket ajeno.
   * **Administradores**: Acceso seguro con usuario y contraseña (hash SHA-256). Disponen de la **Cola Global** para asignarse incidencias abiertas en 1 clic (*"⚡ Asignarme"*), actualizar estados y cambiar prioridades.
+  * **Superadmin**: La cuenta `admin` creada en la primera instalación es el superadmin del sistema. Además de las funciones de administrador, es la única que puede vaciar la base de datos de incidencias o de usuarios.
 * **Gestión de Usuarios (Panel de Administración)**:
   * Creación y gestión de nuevos usuarios estándar y nuevos administradores.
   * Modificación de datos, departamentos, activación/desactivación de cuentas y cambio de contraseñas.
+  * La cuenta superadmin está protegida: no puede degradarse, desactivarse ni eliminarse.
+* **Información del Equipo del Cliente**:
+  * Cada inicio de sesión registra IP, MAC (si está en la misma red), nombre de equipo, usuario de Windows, dominio, navegador y fechas de conexión.
+  * El **agente PowerShell** opcional envía de forma fiable el nombre del equipo, usuario de Windows, dominio, MAC e IP. Se puede ejecutar una vez o instalar al iniciar sesión.
+  * Los administradores pueden consultar las sesiones y los equipos registrados desde el botón **"Equipos"**, y ver el equipo del solicitante dentro de cada incidencia.
 * **Notificaciones en Tiempo Real (HTTP/HTTPS por IP)**:
   * Sistema de avisos con campana, insignias numéricas y ventanas emergentes (*Toast*) instantáneas:
     * **Para el Administrador**: Aviso inmediato cuando un usuario abre una nueva incidencia o comenta en un hilo.
@@ -149,11 +155,13 @@ Al arrancar por primera vez, la base de datos se inicializa automáticamente en 
 
 | Rol | Usuario | Contraseña | Propósito |
 | :--- | :--- | :--- | :--- |
-| **Administrador Principal** | `admin` | `admin123` | Control total, asignación de tickets y gestión de usuarios. |
+| **Superadmin** | `admin` | `admin123` | Control total, gestión de usuarios, borrado de datos y mantenimiento. |
 | **Usuario muestra 1** | `luis` | *(Sin contraseña)* | Pruebas de puesto de Logística y Transporte. |
 | **Usuario muestra 2** | `maria` | *(Sin contraseña)* | Pruebas de puesto de Administración. |
 
-> 💡 **Nota de seguridad**: Tras el primer acceso como `admin`, accede al apartado **"Usuarios"** para crear las cuentas de tu equipo o modificar las contraseñas.
+> 💡 **Nota de seguridad**: Tras el primer acceso como `admin`, accede al apartado **"Usuarios"** para crear las cuentas de tu equipo o modificar las contraseñas. Cambia la contraseña por defecto del superadmin.
+
+> 💡 **Alta automática**: cualquier persona puede entrar en la pestaña **Usuario** con un identificador nuevo; se creará una cuenta estándar activa. El administrador puede desactivarla o eliminarla después.
 
 ---
 
@@ -165,6 +173,38 @@ Cualquier ordenador, tablet o terminal conectado a la red local corporativa pued
 http://<IP_LOCAL_DEL_SERVIDOR>:3000
 ```
 *Ejemplo:* `http://192.168.1.100:3000` o `http://10.0.0.25:3000`
+
+---
+
+## 🖥️ Agente de Datos del Equipo (Windows)
+
+El navegador no puede leer por sí solo la MAC, el usuario de Windows ni el dominio. Para capturarlos de forma fiable, el servidor pone a disposición el agente `IncidenciasTRANS-Agent.ps1`.
+
+1. Entra como administrador y pulsa **Equipos → Descargar agente**.
+2. Copia el fichero al PC del usuario y ejecútalo una vez:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\IncidenciasTRANS-Agent.ps1
+```
+
+3. Para que se ejecute automáticamente en cada inicio de sesión de Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\IncidenciasTRANS-Agent.ps1 -Install
+```
+
+El agente envía al servidor el nombre del equipo, IP, MAC, usuario de Windows, dominio y versión de Windows. El servidor lo asocia a la sesión del usuario por IP y enriquece también las incidencias ya creadas desde ese equipo. Para desplegarlo masivamente se puede distribuir el `.ps1` mediante GPO o una tarea programada.
+
+---
+
+## 🧹 Limpieza de la Base de Datos (solo superadmin)
+
+La cuenta `admin` (superadmin) dispone de una **Zona peligrosa** dentro de **Usuarios** con dos acciones independientes:
+
+* **Vaciar incidencias**: elimina incidencias, mensajes, adjuntos y notificaciones, conservando los usuarios.
+* **Vaciar usuarios**: elimina todos los usuarios excepto el superadmin actual y, por defecto, también sus incidencias y conversaciones. Las sesiones de los usuarios eliminados dejan de ser válidas.
+
+Ambas acciones exigen escribir `BORRAR` para confirmar. **Realiza una copia de seguridad antes de usarlas.**
 
 ---
 

@@ -5,7 +5,7 @@ export type IncidentCategory = 'hardware' | 'software' | 'red' | 'acceso' | 'gen
 export interface User {
   id: number;
   username: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'superadmin';
   full_name: string;
   department: string;
   is_active?: number;
@@ -39,7 +39,7 @@ export interface Message {
   id: number;
   incident_id: number;
   sender_username: string;
-  sender_role: 'user' | 'admin' | 'system';
+  sender_role: 'user' | 'admin' | 'superadmin' | 'system';
   content: string;
   created_at: string;
   sender_name?: string;
@@ -64,6 +64,40 @@ export interface Incident {
   assigned_admin_name?: string;
   message_count?: number;
   attachment_count?: number;
+  client_ip?: string | null;
+  client_mac?: string | null;
+  client_hostname?: string | null;
+  client_windows_user?: string | null;
+  client_windows_domain?: string | null;
+  client_session_id?: number | null;
+}
+
+export interface ClientSession {
+  id: number;
+  username: string;
+  role: string;
+  ip: string | null;
+  mac: string | null;
+  hostname: string | null;
+  windows_user: string | null;
+  windows_domain: string | null;
+  user_agent: string | null;
+  client_source: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
+export interface ClientMachine {
+  id: number;
+  hostname: string | null;
+  ip: string | null;
+  mac: string | null;
+  windows_user: string | null;
+  windows_domain: string | null;
+  os: string | null;
+  source: string;
+  created_at: string;
+  last_seen_at: string;
 }
 
 export interface ServerStats {

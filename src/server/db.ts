@@ -22,7 +22,7 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-      role TEXT NOT NULL DEFAULT 'user', -- 'user' | 'admin'
+      role TEXT NOT NULL DEFAULT 'user', -- 'user' | 'admin' | 'superadmin'
       password_hash TEXT,
       full_name TEXT,
       department TEXT,
@@ -88,6 +88,43 @@ export function initDatabase() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_username, is_read, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT UNIQUE NOT NULL,
+      username TEXT NOT NULL,
+      role TEXT NOT NULL,
+      ip TEXT,
+      mac TEXT,
+      hostname TEXT,
+      windows_user TEXT,
+      windows_domain TEXT,
+      user_agent TEXT,
+      client_source TEXT NOT NULL DEFAULT 'server', -- 'server' | 'agent'
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username);
+    CREATE INDEX IF NOT EXISTS idx_sessions_ip ON sessions(ip);
+
+    CREATE TABLE IF NOT EXISTS client_machines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hostname TEXT,
+      ip TEXT,
+      mac TEXT,
+      windows_user TEXT,
+      windows_domain TEXT,
+      os TEXT,
+      source TEXT NOT NULL DEFAULT 'agent',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_client_machines_ip ON client_machines(ip);
+    CREATE INDEX IF NOT EXISTS idx_client_machines_mac ON client_machines(mac);
+    CREATE INDEX IF NOT EXISTS idx_client_machines_hostname ON client_machines(hostname);
   `);
 
   // Ensure is_active column exists if database was created previously
@@ -97,13 +134,30 @@ export function initDatabase() {
     // Column already exists
   }
 
-  // Seed default admin if not exists
+  // Client machine snapshot columns on incidents (safe on existing databases)
+  const incidentClientColumns = [
+    'client_ip TEXT',
+    'client_mac TEXT',
+    'client_hostname TEXT',
+    'client_windows_user TEXT',
+    'client_windows_domain TEXT',
+    'client_session_id INTEGER',
+  ];
+  for (const column of incidentClientColumns) {
+    try {
+      db.exec(`ALTER TABLE incidents ADD COLUMN ${column};`);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Seed default superadmin if not exists
   const checkAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!checkAdmin) {
     const adminPassHash = crypto.createHash('sha256').update('admin123').digest('hex');
     const insertAdmin = db.prepare(`
       INSERT INTO users (username, role, password_hash, full_name, department)
-      VALUES (?, 'admin', ?, 'Administrador Principal', 'Soporte IT')
+      VALUES (?, 'superadmin', ?, 'Administrador Principal', 'Soporte IT')
     `);
     insertAdmin.run('admin', adminPassHash);
 
@@ -117,6 +171,14 @@ export function initDatabase() {
 
     // Seed initial incidents
     seedInitialData();
+  }
+
+  // Migration: the default "admin" account becomes the system superadmin.
+  // Only do this while no superadmin exists, so a manually created superadmin
+  // is never overwritten.
+  const existingSuperadmin = db.prepare("SELECT id FROM users WHERE role = 'superadmin' LIMIT 1").get();
+  if (!existingSuperadmin) {
+    db.prepare("UPDATE users SET role = 'superadmin' WHERE username = 'admin'").run();
   }
 }
 

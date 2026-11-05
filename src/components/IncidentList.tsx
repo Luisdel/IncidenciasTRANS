@@ -50,7 +50,7 @@ export const IncidentList: React.FC<IncidentListProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string>('todos');
   const [adminViewTab, setAdminViewTab] = useState<'all' | 'unassigned' | 'mine'>('all');
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
   // Filtered incidents
   const filtered = incidents.filter(inc => {

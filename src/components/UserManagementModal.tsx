@@ -11,6 +11,8 @@ import {
   XCircle, 
   Lock, 
   AlertCircle,
+  AlertTriangle,
+  Database,
   RefreshCw
 } from 'lucide-react';
 import { User } from '../types.ts';
@@ -19,12 +21,14 @@ import { apiClient } from '../services/apiClient.ts';
 interface UserManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDataWiped?: () => void;
   currentAdmin: User;
 }
 
 export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   isOpen,
   onClose,
+  onDataWiped,
   currentAdmin,
 }) => {
   const [users, setUsers] = useState<User[]>([]);
@@ -45,9 +49,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editFullName, setEditFullName] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
-  const [editRole, setEditRole] = useState<'user' | 'admin'>('user');
+  const [editRole, setEditRole] = useState<'user' | 'admin' | 'superadmin'>('user');
   const [editPassword, setEditPassword] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
+
+  // Superadmin danger zone
+  const [dangerAction, setDangerAction] = useState<'incidents' | 'users' | null>(null);
+  const [dangerConfirmation, setDangerConfirmation] = useState('');
+  const [dangerDeleteIncidents, setDangerDeleteIncidents] = useState(true);
+  const [isWiping, setIsWiping] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -128,12 +138,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setIsSubmitting(true);
     setError(null);
     try {
+      const isSuperadminTarget = editingUser.role === 'superadmin';
       await apiClient.updateUser(editingUser.id, {
         full_name: editFullName.trim(),
         department: editDepartment.trim(),
-        role: editRole,
+        // The superadmin role and active state are protected server-side.
+        role: isSuperadminTarget ? undefined : (editRole as 'user' | 'admin'),
         password: editPassword.trim() ? editPassword.trim() : undefined,
-        is_active: editIsActive,
+        is_active: isSuperadminTarget ? undefined : editIsActive,
       });
 
       setSuccessMsg(`Usuario @${editingUser.username} actualizado`);
@@ -160,6 +172,48 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     }
   };
 
+  const resetDangerZone = () => {
+    setDangerAction(null);
+    setDangerConfirmation('');
+    setDangerDeleteIncidents(true);
+    setError(null);
+  };
+
+  const handleWipe = async () => {
+    if (!dangerAction) return;
+    if (dangerConfirmation.trim().toUpperCase() !== 'BORRAR') {
+      setError('Escribe BORRAR para confirmar el borrado.');
+      return;
+    }
+
+    setIsWiping(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      if (dangerAction === 'incidents') {
+        const res = await apiClient.wipeIncidents('BORRAR');
+        setSuccessMsg(
+          `${res.message} (${res.deleted.incidents} incidencias, ${res.deleted.messages} mensajes, ${res.deleted.attachments} adjuntos)`
+        );
+      } else {
+        const res = await apiClient.wipeUsers('BORRAR', dangerDeleteIncidents);
+        setSuccessMsg(
+          `${res.message} (${res.deleted.users} usuarios${dangerDeleteIncidents ? ` y ${res.deleted.incidents} incidencias` : ''})`
+        );
+      }
+
+      setDangerAction(null);
+      setDangerConfirmation('');
+      setDangerDeleteIncidents(true);
+      await loadUsers();
+      onDataWiped?.();
+    } catch (err: any) {
+      setError(err.message || 'Error al vaciar la base de datos');
+    } finally {
+      setIsWiping(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -172,8 +226,12 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white">Gestión de Usuarios</h2>
-                <span className="text-[10px] font-semibold bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.2 rounded">
-                  Admin IncidenciasTRANS
+                <span className={`text-[10px] font-semibold border px-2 py-0.2 rounded ${
+                  currentAdmin.role === 'superadmin'
+                    ? 'bg-fuchsia-950 text-fuchsia-300 border-fuchsia-800'
+                    : 'bg-amber-950 text-amber-300 border-amber-800'
+                }`}>
+                  {currentAdmin.role === 'superadmin' ? 'Superadmin IncidenciasTRANS' : 'Admin IncidenciasTRANS'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -383,31 +441,43 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   <label className="block text-[11px] font-medium text-slate-300 mb-1">
                     Rol
                   </label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as 'user' | 'admin')}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-sky-500"
-                  >
-                    <option value="user">Usuario Estándar</option>
-                    <option value="admin">Administrador</option>
-                  </select>
+                  {editingUser.role === 'superadmin' ? (
+                    <div className="w-full px-3 py-1.5 bg-fuchsia-950/40 border border-fuchsia-800/60 rounded-lg text-fuchsia-300 text-xs font-semibold">
+                      Superadmin (rol protegido)
+                    </div>
+                  ) : (
+                    <select
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value as 'user' | 'admin')}
+                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-sky-500"
+                    >
+                      <option value="user">Usuario Estándar</option>
+                      <option value="admin">Administrador</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-medium text-slate-300 mb-1">
                     Estado de la Cuenta
                   </label>
-                  <select
-                    value={editIsActive ? '1' : '0'}
-                    onChange={(e) => setEditIsActive(e.target.value === '1')}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-sky-500"
-                  >
-                    <option value="1">Activo (Puede acceder)</option>
-                    <option value="0">Desactivado (Bloqueado)</option>
-                  </select>
+                  {editingUser.role === 'superadmin' ? (
+                    <div className="w-full px-3 py-1.5 bg-fuchsia-950/40 border border-fuchsia-800/60 rounded-lg text-fuchsia-300 text-xs font-semibold">
+                      Activo (cuenta protegida)
+                    </div>
+                  ) : (
+                    <select
+                      value={editIsActive ? '1' : '0'}
+                      onChange={(e) => setEditIsActive(e.target.value === '1')}
+                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-sky-500"
+                    >
+                      <option value="1">Activo (Puede acceder)</option>
+                      <option value="0">Desactivado (Bloqueado)</option>
+                    </select>
+                  )}
                 </div>
 
-                {editRole === 'admin' && (
+                {(editRole === 'admin' || editingUser.role === 'superadmin') && (
                   <div className="sm:col-span-2">
                     <label className="block text-[11px] font-medium text-slate-300 mb-1">
                       Nueva Contraseña (dejar en blanco para mantener la actual)
@@ -457,6 +527,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {users.map((u) => {
+                  const isSuperadmin = u.role === 'superadmin';
                   const isAdmin = u.role === 'admin';
                   const isActive = u.is_active !== 0;
                   const isCurrent = currentAdmin.id === u.id || currentAdmin.username === u.username;
@@ -466,9 +537,13 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2">
                           <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-[11px] ${
-                            isAdmin ? 'bg-amber-950 text-amber-400 border border-amber-800' : 'bg-slate-800 text-sky-400 border border-slate-700'
+                            isSuperadmin
+                              ? 'bg-fuchsia-950 text-fuchsia-400 border border-fuchsia-800'
+                              : isAdmin
+                                ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                : 'bg-slate-800 text-sky-400 border border-slate-700'
                           }`}>
-                            {isAdmin ? <Shield className="w-3.5 h-3.5" /> : <UserIcon className="w-3.5 h-3.5" />}
+                            {isSuperadmin || isAdmin ? <Shield className="w-3.5 h-3.5" /> : <UserIcon className="w-3.5 h-3.5" />}
                           </div>
                           <div>
                             <span className="font-mono font-semibold text-white">@{u.username}</span>
@@ -485,7 +560,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       </td>
 
                       <td className="py-2.5 px-3">
-                        {isAdmin ? (
+                        {isSuperadmin ? (
+                          <span className="bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800 text-[10px] px-2 py-0.5 rounded font-medium">
+                            Superadmin
+                          </span>
+                        ) : isAdmin ? (
                           <span className="bg-amber-950 text-amber-400 border border-amber-800 text-[10px] px-2 py-0.5 rounded font-medium">
                             Administrador
                           </span>
@@ -514,15 +593,17 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
                       <td className="py-2.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleStartEdit(u)}
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                            title="Editar usuario"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          {(!isSuperadmin || currentAdmin.role === 'superadmin') && (
+                            <button
+                              onClick={() => handleStartEdit(u)}
+                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                              title="Editar usuario"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
-                          {!isCurrent && (
+                          {!isCurrent && !isSuperadmin && (
                             <button
                               onClick={() => handleDeleteUser(u)}
                               className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
@@ -539,11 +620,112 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Superadmin danger zone */}
+          {currentAdmin.role === 'superadmin' && (
+            <div className="border border-red-900/70 bg-red-950/20 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">
+                  Zona peligrosa · Solo superadmin
+                </h3>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Estas acciones son irreversibles. Se exige escribir <strong className="text-red-300">BORRAR</strong> para confirmar.
+                La cuenta superadmin con la que estás conectado nunca se elimina.
+              </p>
+
+              {!dangerAction ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDangerAction('incidents');
+                      setDangerConfirmation('');
+                      setError(null);
+                      setSuccessMsg(null);
+                    }}
+                    className="flex items-center gap-1.5 bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800 text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                  >
+                    <Database className="w-4 h-4 text-red-400" />
+                    Vaciar incidencias
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDangerAction('users');
+                      setDangerConfirmation('');
+                      setDangerDeleteIncidents(true);
+                      setError(null);
+                      setSuccessMsg(null);
+                    }}
+                    className="flex items-center gap-1.5 bg-red-900/80 hover:bg-red-800 text-red-100 border border-red-800 text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-300" />
+                    Vaciar usuarios
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-red-900/50 pt-3">
+                  <p className="text-xs text-red-300 font-semibold leading-relaxed">
+                    {dangerAction === 'incidents'
+                      ? 'Se borrarán TODAS las incidencias, mensajes, adjuntos y notificaciones. Las cuentas de usuario se conservan.'
+                      : 'Se borrarán TODOS los usuarios excepto tu cuenta superadmin. Las sesiones de los demás usuarios quedarán invalidadas.'}
+                  </p>
+
+                  {dangerAction === 'users' && (
+                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dangerDeleteIncidents}
+                        onChange={(e) => setDangerDeleteIncidents(e.target.checked)}
+                        className="accent-red-600"
+                      />
+                      Borrar también todas las incidencias y conversaciones
+                    </label>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Escribe <strong className="text-red-300">BORRAR</strong> para confirmar
+                    </label>
+                    <input
+                      type="text"
+                      value={dangerConfirmation}
+                      onChange={(e) => setDangerConfirmation(e.target.value)}
+                      placeholder="BORRAR"
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-red-800 rounded-lg text-white text-xs focus:outline-hidden focus:border-red-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={resetDangerZone}
+                      disabled={isWiping}
+                      className="px-3 py-1.5 text-xs text-slate-400 hover:text-white disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleWipe}
+                      disabled={isWiping || dangerConfirmation.trim().toUpperCase() !== 'BORRAR'}
+                      className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg shadow disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isWiping ? 'Borrando...' : 'Confirmar borrado'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
-          <span>* Los usuarios estándar acceden con su login sin contraseña desde puestos de la red.</span>
+          <span>* Los usuarios estándar se crean automáticamente al entrar y acceden sin contraseña desde la red.</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors"

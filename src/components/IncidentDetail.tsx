@@ -27,7 +27,9 @@ import {
   Maximize2, 
   RefreshCw,
   Zap,
-  Info
+  Info,
+  Monitor,
+  Copy
 } from 'lucide-react';
 import { ImageViewerModal } from './ImageViewerModal.tsx';
 
@@ -59,10 +61,24 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({
   // Lightbox modal
   const [activeImage, setActiveImage] = useState<{ url: string; filename: string; size: number } | null>(null);
 
+  // Client equipment info copy feedback
+  const [copiedClientField, setCopiedClientField] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+
+  const copyClientField = async (label: string, value?: string | null) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedClientField(label);
+      setTimeout(() => setCopiedClientField(null), 1500);
+    } catch {
+      // Clipboard may be blocked; ignore.
+    }
+  };
 
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -386,6 +402,60 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({
           <span>Hilo ligero optimizado para red privada LAN</span>
         </div>
       </div>
+
+      {/* Client equipment info (admin/superadmin only) */}
+      {isAdmin && (
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
+              <Monitor className="w-4 h-4" />
+              Equipo del solicitante
+            </div>
+            <span className="text-[10px] text-slate-500">Datos para soporte remoto</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-3">
+            {[
+              { label: 'IP', value: incident.client_ip },
+              { label: 'MAC', value: incident.client_mac },
+              { label: 'Equipo', value: incident.client_hostname },
+              { label: 'Usuario Windows', value: incident.client_windows_user },
+              { label: 'Dominio', value: incident.client_windows_domain },
+            ].map((field) => (
+              <div key={field.label} className="bg-slate-950/60 border border-slate-800 rounded-lg px-2.5 py-1.5">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">{field.label}</div>
+                <div className="text-xs text-slate-200 font-mono truncate flex items-center gap-1">
+                  {field.value ? (
+                    <>
+                      <span className="truncate">{field.value}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyClientField(field.label, field.value)}
+                        className="text-slate-500 hover:text-sky-300 shrink-0"
+                        title="Copiar"
+                      >
+                        {copiedClientField === field.label ? (
+                          <CheckCircle className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {!incident.client_ip && !incident.client_mac && !incident.client_hostname && !incident.client_windows_user && !incident.client_windows_domain && (
+            <p className="text-[10px] text-slate-500 mt-2">
+              Sin datos del equipo. Instala el agente de IncidenciasTRANS en el PC del usuario para capturar MAC, equipo, usuario y dominio.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Conversation Thread Container */}
       <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col min-h-[420px]">

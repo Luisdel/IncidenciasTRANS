@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Incident } from './types.ts';
-import { apiClient } from './services/apiClient.ts';
+import { apiClient, setSessionToken } from './services/apiClient.ts';
 import { Header } from './components/Header.tsx';
 import { IncidentList } from './components/IncidentList.tsx';
 import { IncidentDetail } from './components/IncidentDetail.tsx';
@@ -8,12 +8,20 @@ import { NewIncidentModal } from './components/NewIncidentModal.tsx';
 import { ServerInfoModal } from './components/ServerInfoModal.tsx';
 import { LoginView } from './components/LoginView.tsx';
 import { UserManagementModal } from './components/UserManagementModal.tsx';
+import { ClientSessionsModal } from './components/ClientSessionsModal.tsx';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem('incidencias_user');
-      return stored ? JSON.parse(stored) : null;
+      const token = localStorage.getItem('incidencias_token');
+      if (!stored || !token) {
+        // Sessions are now backed by a server token. Force a fresh login
+        // for browsers that still have the old localStorage format.
+        if (stored && !token) localStorage.removeItem('incidencias_user');
+        return null;
+      }
+      return JSON.parse(stored);
     } catch {
       return null;
     }
@@ -29,6 +37,9 @@ export default function App() {
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [isClientSessionsOpen, setIsClientSessionsOpen] = useState(false);
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
   // Fetch incidents list (with strict user isolation on SQLite server)
   const fetchIncidents = useCallback(async (silent = false) => {
@@ -60,7 +71,8 @@ export default function App() {
   }, [fetchIncidents]);
 
   // Handle user login success
-  const handleLoginSuccess = (user: User) => {
+  const handleLoginSuccess = (user: User, token: string) => {
+    setSessionToken(token);
     setCurrentUser(user);
     try {
       localStorage.setItem('incidencias_user', JSON.stringify(user));
@@ -77,7 +89,7 @@ export default function App() {
 
   // Quick self-assign from list (Admin only)
   const handleQuickAssign = async (incidentId: number) => {
-    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!currentUser || !isAdmin) return;
     try {
       await apiClient.assignIncident(incidentId, currentUser.username);
       await fetchIncidents(true);
@@ -97,6 +109,7 @@ export default function App() {
         }}
         onOpenServerModal={() => setIsServerModalOpen(true)}
         onOpenUserManagement={() => setIsUserManagementOpen(true)}
+        onOpenClientSessions={() => setIsClientSessionsOpen(true)}
         onSwitchUser={handleSwitchUser}
         onSelectIncident={(id) => setSelectedIncidentId(id)}
       />
@@ -150,15 +163,23 @@ export default function App() {
         onClose={() => setIsServerModalOpen(false)}
       />
 
-      {currentUser && currentUser.role === 'admin' && (
-        <UserManagementModal
-          isOpen={isUserManagementOpen}
-          onClose={() => {
-            setIsUserManagementOpen(false);
-            fetchIncidents(true);
-          }}
-          currentAdmin={currentUser}
-        />
+      {currentUser && isAdmin && (
+        <>
+          <UserManagementModal
+            isOpen={isUserManagementOpen}
+            onClose={() => {
+              setIsUserManagementOpen(false);
+              fetchIncidents(true);
+            }}
+            onDataWiped={() => fetchIncidents(true)}
+            currentAdmin={currentUser}
+          />
+          <ClientSessionsModal
+            isOpen={isClientSessionsOpen}
+            onClose={() => setIsClientSessionsOpen(false)}
+            currentAdmin={currentUser}
+          />
+        </>
       )}
     </div>
   );

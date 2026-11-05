@@ -1,4 +1,4 @@
-import { Incident, Message, ServerStats, User } from '../types.ts';
+import { ClientMachine, ClientSession, Incident, Message, ServerStats, User } from '../types.ts';
 
 // Bandwidth telemetry for low-network transparency
 export interface NetworkStats {
@@ -29,10 +29,24 @@ function notifyStats() {
   for (const cb of listeners) cb();
 }
 
+export function setSessionToken(token: string | null) {
+  if (typeof localStorage === 'undefined') return;
+  if (token) {
+    localStorage.setItem('incidencias_token', token);
+  } else {
+    localStorage.removeItem('incidencias_token');
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const start = performance.now();
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
+
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('incidencias_token') : null;
+  if (token) {
+    headers.set('X-Session-Token', token);
+  }
 
   let bodyLength = 0;
   if (options.body && typeof options.body === 'string') {
@@ -76,7 +90,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const apiClient = {
   // Auth
-  loginUser: async (username: string, fullName?: string, department?: string): Promise<{ success: boolean; user: User }> => {
+  loginUser: async (username: string, fullName?: string, department?: string): Promise<{ success: boolean; user: User; token: string }> => {
     return request('/auth/user-login', {
       method: 'POST',
       body: JSON.stringify({ username, fullName, department }),
@@ -161,7 +175,7 @@ export const apiClient = {
     incidentId: number,
     payload: {
       sender_username: string;
-      sender_role: 'user' | 'admin';
+      sender_role: 'user' | 'admin' | 'superadmin';
       content: string;
       attachment?: {
         filename: string;
@@ -232,6 +246,40 @@ export const apiClient = {
     return request('/notifications/mark-all-read', {
       method: 'PATCH',
       body: JSON.stringify({ username, role }),
+    });
+  },
+
+  // Client sessions and registered machines (Admin / Superadmin)
+  getSessions: async (): Promise<ClientSession[]> => {
+    return request('/sessions');
+  },
+
+  getClientMachines: async (): Promise<ClientMachine[]> => {
+    return request('/client-machines');
+  },
+
+  getAgentDownloadUrl: (): string => '/api/client-agent.ps1',
+
+  // Superadmin database maintenance
+  wipeIncidents: async (confirmation: string): Promise<{
+    success: boolean;
+    message: string;
+    deleted: { incidents: number; messages: number; attachments: number; notifications: number };
+  }> => {
+    return request('/admin/wipe/incidents', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation }),
+    });
+  },
+
+  wipeUsers: async (confirmation: string, deleteIncidents: boolean): Promise<{
+    success: boolean;
+    message: string;
+    deleted: { users: number; incidents: number };
+  }> => {
+    return request('/admin/wipe/users', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation, deleteIncidents }),
     });
   },
 
