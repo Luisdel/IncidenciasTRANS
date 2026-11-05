@@ -2,13 +2,13 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, Plugin } from 'vite';
-import express from 'express';
-import { apiRouter } from './src/server/api.ts';
 
 function incidenciasTransApiPlugin(): Plugin {
   return {
     name: 'incidencias-trans-api',
-    configureServer(server) {
+    async configureServer(server) {
+      const express = (await import('express')).default;
+      const { apiRouter } = await import('./src/server/api.ts');
       const app = express();
       app.use(express.json({ limit: '10mb' }));
       app.use('/api', apiRouter);
@@ -23,7 +23,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), incidenciasTransApiPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve('.'),
       },
     },
     server: {

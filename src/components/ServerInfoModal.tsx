@@ -63,7 +63,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/incidencias-trans
-ExecStart=/usr/bin/node /opt/incidencias-trans/server.ts
+ExecStart=/usr/bin/node /opt/incidencias-trans/dist/server.js
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production

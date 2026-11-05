@@ -18,8 +18,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api', apiRouter);
 
 // Serve static frontend files built in dist/
-const distPath = path.resolve(__dirname, 'dist');
-if (fs.existsSync(distPath)) {
+const candidates = [
+  path.resolve(__dirname, 'dist'),
+  path.resolve(process.cwd(), 'dist'),
+  path.resolve(__dirname),
+];
+const distPath = candidates.find(dir => fs.existsSync(path.join(dir, 'index.html')));
+
+if (distPath) {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
