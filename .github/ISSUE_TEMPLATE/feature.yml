@@ -1,0 +1,24 @@
+name: Solicitud de funcionalidad
+description: Propón una mejora o nueva capacidad
+title: "[Funcionalidad]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema o necesidad
+      description: Describe el caso de uso y el comportamiento que falta.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solución propuesta
+      description: Explica el resultado esperado y, si es posible, alternativas consideradas.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Alcance
+      description: Indica restricciones, compatibilidad y posibles efectos sobre seguridad o datos.

@@ -1,0 +1,32 @@
+name: Informe de error
+description: Informa de un comportamiento incorrecto
+title: "[Error]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción
+      description: Explica qué ocurrió y qué esperabas que ocurriera.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Pasos para reproducir
+      description: Indica los pasos mínimos y, si procede, datos ficticios.
+      placeholder: "1. Acceder como...\n2. Pulsar...\n3. Observar..."
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Entorno
+      description: Versión de Node.js, navegador, sistema operativo y configuración relevante.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Registros o capturas
+      description: Incluye solo información depurada. Elimina usuarios, sesiones, IPs y datos reales si no son necesarios.
