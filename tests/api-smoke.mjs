@@ -16,7 +16,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const entry = process.env.SERVER_ENTRY || '/opt/incidencias-trans/dist/server.js';
+const entry = process.env.SERVER_ENTRY
+  ? path.resolve(process.env.SERVER_ENTRY)
+  : path.resolve(process.cwd(), 'dist/server.js');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'incidencias-smoke-'));
 const port = 3101 + Math.floor(Math.random() * 300);
 const base = `http://127.0.0.1:${port}`;
