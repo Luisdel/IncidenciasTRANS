@@ -279,9 +279,79 @@ Puedes programar esta línea en el `crontab` de Linux para que se ejecute a diar
 * `npm run build`: Compila el frontend a producción y genera el bundle del servidor Node (`dist/server.js`).
 * `npm start`: Inicia el servidor de producción compilado (`node dist/server.js`).
 * `npm run lint`: Valida tipos TypeScript en todo el proyecto.
+* `npm test`: Ejecuta el test de humo de la API sobre una base SQLite temporal.
+
+---
+
+## 🧰 Tecnologías y Estructura
+
+* Frontend: React 19, Tailwind CSS 4 y Vite.
+* Backend: Node.js, Express y `node:sqlite`.
+* Lenguaje: TypeScript con compilación ESM.
+* Base de datos: SQLite local en `data/incidencias.db`, con WAL habilitado.
+
+Estructura principal:
+
+```text
+src/App.tsx              Componente principal del cliente
+src/components/          Vistas y componentes React
+src/services/apiClient.ts Cliente HTTP usado por el frontend
+src/server/api.ts        Rutas y autenticación del API
+src/server/db.ts         Esquema SQLite y datos iniciales
+server.ts                Servidor Express y despliegue estático
+tests/api-smoke.mjs      Test de humo aislado de la API
+tests/prod-verify.mjs    Verificación contra una instalación ya desplegada
+vite.config.ts           Servidor Vite y proxy de desarrollo
+```
+
+---
+
+## 🔧 Variables de Entorno
+
+El servidor no necesita secretos para arrancar. Copia `.env.example` a `.env` solo si quieres personalizar valores:
+
+| Variable | Predeterminado | Uso |
+| :--- | :--- | :--- |
+| `PORT` | `3000` | Puerto HTTP del servidor de producción. |
+| `PUBLIC_URL` | Dirección de la petición | URL pública usada en enlaces generados por el API. |
+| `DISABLE_HMR` | `false` | Desactiva HMR y el observador de Vite en entornos limitados. |
+| `SERVER_ENTRY` | `dist/server.js` | Ruta alternativa al servidor usada por `tests/api-smoke.mjs`. |
+| `BASE_URL` | `http://127.0.0.1:3000/api` | Dirección usada únicamente por `tests/prod-verify.mjs`. |
+
+No añadas claves, contraseñas ni tokens al repositorio. Las variables locales deben mantenerse fuera de Git.
+
+---
+
+## 🧪 Desarrollo, Tests y Checks
+
+```bash
+npm install
+npm run lint
+npm test
+npm run build
+npm start
+```
+
+`npm test` crea una base SQLite temporal en un directorio temporal y ejecuta el servidor construido. Para comprobar una instalación ya publicada, la base no debe contener datos reales sensibles:
+
+```bash
+BASE_URL=http://127.0.0.1:3000/api node tests/prod-verify.mjs
+```
+
+Ese último test crea y elimina un usuario de prueba; no debe ejecutarse con datos operativos si no se admite esa modificación.
+
+### Configuración de IDE
+
+Se recomienda VS Code con las extensiones TypeScript/JavaScript y Tailwind CSS. El archivo `.editorconfig` normaliza finales de línea, indentación y UTF-8. No es necesario instalar plugins adicionales para editar o compilar el proyecto.
+
+---
+
+## 🤝 Contribución y Seguridad
+
+Las contribuciones deben seguir `CONTRIBUTING.md`. Consulta `SECURITY.md` antes de comunicar vulnerabilidades o cuestiones sensibles. No publiques contraseñas, datos de incidencias, archivos SQLite ni capturas con información corporativa.
 
 ---
 
 ## 📄 Licencia
 
-Software desarrollado para uso interno corporativo bajo licencia Apache-2.0.
+El texto histórico de esta sección mencionaba Apache-2.0, pero el repositorio no incluye actualmente un archivo `LICENSE` que defina los términos aplicables. La licencia debe confirmarse antes de redistribuir el software o incorporar contribuciones externas.
